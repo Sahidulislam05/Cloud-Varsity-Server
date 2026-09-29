@@ -14,7 +14,7 @@ programRouter.post(
   validateRequest(createProgramValidationSchema),
   ProgramController.createProgram,
 );
-programRouter.get("/", auth(), ProgramController.getAllPrograms);
+programRouter.get("/", ProgramController.getAllPrograms);
 programRouter.patch(
   "/:id",
   auth("SUPER_ADMIN", "DEPARTMENT_ADMIN"),

@@ -14,8 +14,8 @@ courseRouter.post(
   validateRequest(createCourseValidationSchema),
   CourseController.createCourse,
 );
-courseRouter.get("/", auth(), CourseController.getAllCourses);
-courseRouter.get("/:id", auth(), CourseController.getSingleCourse);
+courseRouter.get("/", CourseController.getAllCourses);
+courseRouter.get("/:id", CourseController.getSingleCourse);
 courseRouter.patch(
   "/:id",
   auth("SUPER_ADMIN", "DEPARTMENT_ADMIN"),

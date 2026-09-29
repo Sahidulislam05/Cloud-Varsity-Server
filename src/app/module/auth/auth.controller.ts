@@ -5,10 +5,17 @@ import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
 import { AuthService } from "./auth.service";
 
+// const cookieOptions = {
+//   httpOnly: true,
+//   secure: config.node_env === "production",
+//   sameSite: "strict" as const,
+// };
+
 const cookieOptions = {
   httpOnly: true,
   secure: config.node_env === "production",
-  sameSite: "strict" as const,
+  sameSite:
+    config.node_env === "production" ? ("none" as const) : ("lax" as const),
 };
 
 const registerUser = catchAsync(async (req: Request, res: Response) => {

@@ -1,8 +1,7 @@
 import { Router } from "express";
-import { auth } from "../../middleware/checkAuth";
 import { UniversityController } from "./university.controller";
 
 const universityRouter = Router();
-universityRouter.get("/", auth(), UniversityController.getAllUniversities);
+universityRouter.get("/", UniversityController.getAllUniversities);
 
 export const UniversityRoutes = universityRouter;

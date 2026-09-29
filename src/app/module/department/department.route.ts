@@ -8,13 +8,14 @@ import {
 import { DepartmentController } from "./department.controller";
 
 const departmentRouter = Router();
+
 departmentRouter.post(
   "/",
   auth("SUPER_ADMIN"),
   validateRequest(createDepartmentValidationSchema),
   DepartmentController.createDepartment,
 );
-departmentRouter.get("/", auth(), DepartmentController.getAllDepartments);
+departmentRouter.get("/", DepartmentController.getAllDepartments);
 departmentRouter.patch(
   "/:id",
   auth("SUPER_ADMIN"),
