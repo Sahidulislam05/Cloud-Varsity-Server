@@ -28,6 +28,7 @@ import { ResultRoutes } from "./app/module/result/result.route";
 import helmet from "helmet";
 import { globalRateLimiter } from "./app/middleware/rateLimiter";
 import { ExamRoutes } from "./app/module/examination/exam.route";
+import { ContactRoutes } from "./app/module/contact/contact.route";
 
 const app: Application = express();
 
@@ -60,6 +61,7 @@ app.use("/api/v1/payments", PaymentRoutes);
 app.use("/api/v1/notifications", NotificationRoutes);
 app.use("/api/v1/admin", AdminRoutes);
 app.use("/api/v1/reports", ReportRoutes);
+app.use("/api/v1/contact", ContactRoutes);
 
 app.get("/", async (req: Request, res: Response) => {
   res.status(httpStatus.OK).json({
