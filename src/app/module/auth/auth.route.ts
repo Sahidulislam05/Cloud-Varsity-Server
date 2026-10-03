@@ -8,6 +8,7 @@ import {
   registerValidationSchema,
   resetPasswordValidationSchema,
 } from "./auth.validation";
+import { loginRateLimiter } from "../../middleware/rateLimiter";
 
 const router = Router();
 
@@ -18,6 +19,7 @@ router.post(
 );
 router.post(
   "/login",
+  loginRateLimiter,
   validateRequest(loginValidationSchema),
   AuthController.loginUser,
 );

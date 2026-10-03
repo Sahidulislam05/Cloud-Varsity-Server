@@ -11,16 +11,22 @@ import { AuthService } from "./auth.service";
 //   sameSite: "strict" as const,
 // };
 
+const isProduction = config.node_env === "production";
+
 const cookieOptions = {
   httpOnly: true,
-  secure: config.node_env === "production",
-  sameSite:
-    config.node_env === "production" ? ("none" as const) : ("lax" as const),
+  secure: isProduction,
+  sameSite: isProduction ? ("none" as const) : ("lax" as const),
+};
+
+const refreshCookieOptions = {
+  ...cookieOptions,
+  maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
 const registerUser = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.registerUser(req.body);
-  res.cookie("refreshToken", result.refreshToken, cookieOptions);
+  res.cookie("refreshToken", result.refreshToken, refreshCookieOptions);
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.CREATED,
@@ -31,7 +37,7 @@ const registerUser = catchAsync(async (req: Request, res: Response) => {
 
 const loginUser = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.loginUser(req.body);
-  res.cookie("refreshToken", result.refreshToken, cookieOptions);
+  res.cookie("refreshToken", result.refreshToken, refreshCookieOptions);
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
@@ -62,7 +68,7 @@ const logoutUser = catchAsync(async (req: Request, res: Response) => {
 
 const googleLogin = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.googleLogin(req.body);
-  res.cookie("refreshToken", result.refreshToken, cookieOptions);
+  res.cookie("refreshToken", result.refreshToken, refreshCookieOptions);
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,

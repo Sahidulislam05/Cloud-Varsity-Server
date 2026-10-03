@@ -31,14 +31,23 @@ import { ExamRoutes } from "./app/module/examination/exam.route";
 import { ContactRoutes } from "./app/module/contact/contact.route";
 
 const app: Application = express();
+app.set("trust proxy", 1);
 
-app.use(helmet());
+// app.use(helmet());
+// app.use(
+//   cors({
+//     origin: config.frontend_url,
+//     credentials: true,
+//   }),
+// );
+
 app.use(
   cors({
-    origin: config.frontend_url,
+    origin: config.frontend_url?.split(",").map((o) => o.trim()),
     credentials: true,
   }),
 );
+
 app.use(globalRateLimiter);
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
