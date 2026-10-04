@@ -1,4 +1,3 @@
-// src/app/module/academics/section.service.ts
 import httpStatus from "http-status";
 import { prisma } from "../../lib/prisma";
 import { AppError } from "../../utils/appError";
@@ -64,7 +63,10 @@ const getAllSections = async (query: {
     include: {
       course: true,
       semester: true,
-      instructor: { include: { user: true } },
+      instructor: {
+        include: { user: { select: { name: true, email: true } } },
+      },
+      _count: { select: { registrations: { where: { status: "ENROLLED" } } } },
     },
   });
 };

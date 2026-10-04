@@ -2,7 +2,6 @@ import httpStatus from "http-status";
 import type { AttendanceStatus, Role } from "../../../generated/prisma/enums";
 import { prisma } from "../../lib/prisma";
 import { AppError } from "../../utils/appError";
-import { assertDepartmentAccess } from "../../utils/assertDepartmentAccess";
 import type {
   TAttendanceListQuery,
   TMarkAttendancePayload,
@@ -94,7 +93,9 @@ const getAttendanceForSection = async (
       sectionId: query.sectionId,
       ...(query.date && { date: normalizeDate(query.date) }),
     },
-    include: { student: { include: { user: true } } },
+    include: {
+      student: { include: { user: { select: { name: true, email: true } } } },
+    },
     orderBy: [{ date: "desc" }],
   });
 };

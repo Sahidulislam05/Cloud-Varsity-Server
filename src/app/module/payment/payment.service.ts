@@ -44,10 +44,12 @@ const initiatePayment = async (userId: string, invoiceId: string) => {
     total_amount: Number(invoice.amount),
     currency: "BDT",
     tran_id: transactionId,
-    success_url: `${config.backend_url}/api/v1/finance/payments/success`,
-    fail_url: `${config.backend_url}/api/v1/finance/payments/fail`,
-    cancel_url: `${config.backend_url}/api/v1/finance/payments/cancel`,
-    ipn_url: `${config.backend_url}/api/v1/finance/payments/ipn`,
+
+    success_url: `${config.backend_url}/api/v1/payments/success`,
+    fail_url: `${config.backend_url}/api/v1/payments/fail`,
+    cancel_url: `${config.backend_url}/api/v1/payments/cancel`,
+    ipn_url: `${config.backend_url}/api/v1/payments/ipn`,
+
     shipping_method: "NO",
     product_name: "Semester Tuition Fee",
     product_category: "Education",
@@ -181,7 +183,10 @@ const getAllInvoices = async (query: TInvoiceListQuery) => {
       where,
       skip,
       take: limit,
-      include: { student: { include: { user: true } }, feeStructure: true },
+      include: {
+        student: { include: { user: { select: { name: true, email: true } } } },
+        feeStructure: true,
+      },
       orderBy: { createdAt: "desc" },
     }),
     prisma.invoice.count({ where }),

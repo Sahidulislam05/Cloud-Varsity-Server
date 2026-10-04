@@ -181,7 +181,9 @@ const getMyRegistrations = async (userId: string) => {
         include: {
           course: true,
           semester: true,
-          instructor: { include: { user: true } },
+          instructor: {
+            include: { user: { select: { name: true, email: true } } },
+          },
         },
       },
     },
@@ -217,7 +219,7 @@ const getAllRegistrations = async (
       skip,
       take: limit,
       include: {
-        student: { include: { user: true } },
+        student: { include: { user: { select: { name: true, email: true } } } },
         section: { include: { course: true, semester: true } },
       },
       orderBy: { registeredAt: "desc" },
