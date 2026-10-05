@@ -4,6 +4,7 @@ import { AppError } from "../../utils/appError";
 import { assertDepartmentAccess } from "../../utils/assertDepartmentAccess";
 import type { Role } from "../../../generated/prisma/enums";
 import { TCreateSectionPayload } from "../academics/academics.interface";
+import { assertSectionAccess } from "../../utils/assertSectionAccess";
 
 const createSection = async (
   payload: TCreateSectionPayload,
@@ -80,7 +81,11 @@ const getMySections = async (userId: string) => {
 
   return prisma.section.findMany({
     where: { instructorId: instructorProfile.id, deletedAt: null },
-    include: { course: true, semester: true },
+    include: {
+    course: true,
+    semester: true,
+    _count: { select: { registrations: { where: { status: "ENROLLED" } } } },
+  },
   });
 };
 
@@ -106,9 +111,34 @@ const deleteSection = async (
   });
 };
 
+const getSectionStudents = async (
+  sectionId: string,
+  requester: { userId: string; role: Role; departmentId: string | null },
+) => {
+  // instructor হলে section টা তার নিজের কিনা, department admin হলে নিজের department এর কিনা, সেই যাচাই
+  await assertSectionAccess(sectionId, requester);
+
+  const registrations = await prisma.courseRegistration.findMany({
+    where: { sectionId, status: "ENROLLED" },
+    select: { student: { select: { id: true, studentId: true, user: { select: { name: true, email: true } } } } },
+    orderBy: { student: { studentId: "asc" } },
+  });
+
+  return registrations.map(({ student }) => ({
+    id: student.id, // StudentProfile.id: attendance আর result এর API এ এটাই "studentId"
+    studentId: student.studentId,
+    name: student.user.name,
+    email: student.user.email,
+  }));
+};
+
 export const SectionService = {
   createSection,
   getAllSections,
   getMySections,
   deleteSection,
+  getSectionStudents
+  
 };
+
+

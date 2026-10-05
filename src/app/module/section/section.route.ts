@@ -23,4 +23,10 @@ sectionRouter.delete(
   SectionController.deleteSection,
 );
 
+sectionRouter.get(
+  "/:id/students",
+  auth("INSTRUCTOR", "DEPARTMENT_ADMIN", "REGISTRAR", "SUPER_ADMIN"),
+  SectionController.getSectionStudents,
+);
+
 export const SectionRoutes = sectionRouter;

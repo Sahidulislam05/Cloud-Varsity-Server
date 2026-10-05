@@ -1,4 +1,4 @@
-// src/app/module/academics/section.controller.ts
+
 import type { Request, Response } from "express";
 import httpStatus from "http-status";
 import { catchAsync } from "../../utils/catchAsync";
@@ -45,9 +45,23 @@ const deleteSection = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getSectionStudents = catchAsync(async (req: Request, res: Response) => {
+  const result = await SectionService.getSectionStudents(
+    req.params.id as string,
+    req.user!,
+  );
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Section students retrieved successfully",
+    data: result,
+  });
+});
+
 export const SectionController = {
   createSection,
   getAllSections,
   getMySections,
   deleteSection,
+  getSectionStudents,
 };

@@ -19,5 +19,10 @@ router.patch(
 );
 router.get("/my-results", auth("STUDENT"), ResultController.getMyResults);
 router.get("/my-transcript", auth("STUDENT"), ResultController.getMyTranscript);
+router.get(
+  "/exams/:examId",
+  auth("INSTRUCTOR", "DEPARTMENT_ADMIN", "REGISTRAR", "SUPER_ADMIN"),
+  ResultController.getExamResults,
+);
 
 export const ResultRoutes = router;

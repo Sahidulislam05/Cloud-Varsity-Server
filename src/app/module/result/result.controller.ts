@@ -49,9 +49,23 @@ const getMyTranscript = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const getExamResults = catchAsync(async (req: Request, res: Response) => {
+  const result = await ResultService.getExamResults(
+    req.params.examId as string,
+    req.user!,
+  );
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Exam results retrieved successfully",
+    data: result,
+  });
+});
+
 export const ResultController = {
   submitResults,
   publishSectionResults,
   getMyResults,
   getMyTranscript,
+  getExamResults,
 };

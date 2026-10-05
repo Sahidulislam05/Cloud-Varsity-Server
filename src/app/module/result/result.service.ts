@@ -305,10 +305,23 @@ const getMyTranscript = async (userId: string) => {
   };
 };
 
+const getExamResults = async (examId: string, requester: TRequester) => {
+  const exam = await prisma.exam.findUnique({ where: { id: examId } });
+  if (!exam) throw new AppError(httpStatus.NOT_FOUND, "Exam not found");
+
+  await assertSectionAccess(exam.sectionId, requester);
+
+  return prisma.result.findMany({
+    where: { examId },
+    select: { studentId: true, obtainedMarks: true, publishedAt: true },
+  });
+};
+
 export const ResultService = {
   submitResults,
   publishSectionResults,
   getMyResults,
   getMyTranscript,
   recalculateCgpa,
+  getExamResults,
 };
