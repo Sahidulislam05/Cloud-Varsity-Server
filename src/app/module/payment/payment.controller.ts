@@ -1,15 +1,36 @@
 import type { Request, Response } from "express";
 import httpStatus from "http-status";
+import config from "../../config";
 import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
 import { PaymentService } from "./payment.service";
 import { TInvoiceListQuery } from "../finance/finance.interface";
-import config from "../../config";
+
+const frontendBase = () =>
+  (config.frontend_url ?? "").split(",")[0].trim().replace(/\/$/, "");
+
+const redirectToFrontend = (
+  res: Response,
+  path: string,
+  params: Record<string, string | undefined>,
+) => {
+  const url = new URL(`${frontendBase()}${path}`);
+  for (const [key, value] of Object.entries(params)) {
+    if (value) url.searchParams.set(key, value);
+  }
+
+  res.redirect(httpStatus.SEE_OTHER, url.toString());
+};
+
+const getBodyString = (body: unknown, key: string): string | undefined => {
+  const value = (body as Record<string, unknown> | undefined)?.[key];
+  return typeof value === "string" && value.length > 0 ? value : undefined;
+};
 
 const initiatePayment = catchAsync(async (req: Request, res: Response) => {
   const result = await PaymentService.initiatePayment(
     req.user!.userId,
-    req.params.invoiceId as string,
+    req.params.invoiceId,
   );
   sendResponse(res, {
     success: true,
@@ -20,26 +41,54 @@ const initiatePayment = catchAsync(async (req: Request, res: Response) => {
 });
 
 const paymentSuccess = catchAsync(async (req: Request, res: Response) => {
-  const { tran_id, val_id } = req.body;
-  await PaymentService.completePayment(tran_id, val_id);
-  res.redirect(`${config.frontend_url}/payment/success?tran_id=${tran_id}`);
+  const tranId = getBodyString(req.body, "tran_id");
+  const valId = getBodyString(req.body, "val_id");
+
+  let verified = false;
+  try {
+    if (tranId && valId) {
+      await PaymentService.completePayment(tranId, valId);
+      verified = true;
+    }
+  } catch {
+    // SSLCommerz এর validate ব্যর্থ হলে ইউজারকে JSON error না দেখিয়ে ব্যর্থতার পেজে পাঠাই
+    verified = false;
+  }
+
+  if (verified)
+    redirectToFrontend(res, "/payment/success", { tran_id: tranId });
+  else
+    redirectToFrontend(res, "/payment/cancel", {
+      tran_id: tranId,
+      reason: "failed",
+    });
 });
 
 const paymentFail = catchAsync(async (req: Request, res: Response) => {
-  await PaymentService.markPaymentFailed(req.body.tran_id);
-  res.redirect(`${config.frontend_url}/payment/fail`);
+  const tranId = getBodyString(req.body, "tran_id");
+  // ⚠️ tran_id না থাকলে updateMany এর where ফাঁকা হয়ে যেত আর সবার PENDING payment FAILED হয়ে যেত
+  if (tranId) await PaymentService.markPaymentFailed(tranId);
+  redirectToFrontend(res, "/payment/cancel", {
+    tran_id: tranId,
+    reason: "failed",
+  });
 });
 
 const paymentCancel = catchAsync(async (req: Request, res: Response) => {
-  await PaymentService.markPaymentCancelled(req.body.tran_id);
-  res.redirect(`${config.frontend_url}/payment/cancel`);
+  const tranId = getBodyString(req.body, "tran_id");
+  if (tranId) await PaymentService.markPaymentCancelled(tranId);
+  redirectToFrontend(res, "/payment/cancel", { tran_id: tranId });
 });
 
 const paymentIpn = catchAsync(async (req: Request, res: Response) => {
-  const { tran_id, val_id } = req.body;
+  const tranId = getBodyString(req.body, "tran_id");
+  const valId = getBodyString(req.body, "val_id");
+
   try {
-    await PaymentService.completePayment(tran_id, val_id);
-  } catch {}
+    if (tranId && valId) await PaymentService.completePayment(tranId, valId);
+  } catch {
+    // IPN কে সবসময় 200 দিয়ে জানাতে হয়, নইলে SSLCommerz বারবার retry করে
+  }
   res.status(httpStatus.OK).send("IPN received");
 });
 
