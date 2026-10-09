@@ -29,6 +29,7 @@ import helmet from "helmet";
 import { globalRateLimiter } from "./app/middleware/rateLimiter";
 import { ExamRoutes } from "./app/module/examination/exam.route";
 import { ContactRoutes } from "./app/module/contact/contact.route";
+import { InstructorRoutes } from "./app/module/instructor/instructor.route";
 
 const app: Application = express();
 app.set("trust proxy", 1);
@@ -71,6 +72,7 @@ app.use("/api/v1/notifications", NotificationRoutes);
 app.use("/api/v1/admin", AdminRoutes);
 app.use("/api/v1/reports", ReportRoutes);
 app.use("/api/v1/contact", ContactRoutes);
+app.use("/api/v1/instructors", InstructorRoutes);
 
 app.get("/", async (req: Request, res: Response) => {
   res.status(httpStatus.OK).json({

@@ -54,12 +54,16 @@ const createSection = async (
 const getAllSections = async (query: {
   semesterId?: string;
   courseId?: string;
+  departmentId?: string;
 }) => {
   return prisma.section.findMany({
     where: {
       deletedAt: null,
       ...(query.semesterId && { semesterId: query.semesterId }),
       ...(query.courseId && { courseId: query.courseId }),
+      ...(query.departmentId && {
+        course: { program: { departmentId: query.departmentId } },
+      }),
     },
     include: {
       course: true,
@@ -82,10 +86,10 @@ const getMySections = async (userId: string) => {
   return prisma.section.findMany({
     where: { instructorId: instructorProfile.id, deletedAt: null },
     include: {
-    course: true,
-    semester: true,
-    _count: { select: { registrations: { where: { status: "ENROLLED" } } } },
-  },
+      course: true,
+      semester: true,
+      _count: { select: { registrations: { where: { status: "ENROLLED" } } } },
+    },
   });
 };
 
@@ -120,7 +124,15 @@ const getSectionStudents = async (
 
   const registrations = await prisma.courseRegistration.findMany({
     where: { sectionId, status: "ENROLLED" },
-    select: { student: { select: { id: true, studentId: true, user: { select: { name: true, email: true } } } } },
+    select: {
+      student: {
+        select: {
+          id: true,
+          studentId: true,
+          user: { select: { name: true, email: true } },
+        },
+      },
+    },
     orderBy: { student: { studentId: "asc" } },
   });
 
@@ -137,8 +149,5 @@ export const SectionService = {
   getAllSections,
   getMySections,
   deleteSection,
-  getSectionStudents
-  
+  getSectionStudents,
 };
-
-

@@ -18,6 +18,8 @@ const getMe = async (userId: string) => {
       avatar: true,
       isActive: true,
       createdAt: true,
+      departmentId: true,
+      department: { select: { id: true, name: true, code: true } },
       studentProfile: true,
       instructorProfile: true,
     },
