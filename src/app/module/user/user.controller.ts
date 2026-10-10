@@ -52,9 +52,25 @@ const updateUserStatus = catchAsync(async (req: Request, res: Response) => {
   });
 });
 
+const assignDepartment = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserService.assignDepartment(
+    req.params.id,
+    req.body,
+    req.user!.userId,
+  );
+
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Department assigned successfully",
+    data: result,
+  });
+});
+
 export const UserController = {
   getMe,
   updateMe,
   getAllUsers,
   updateUserStatus,
+  assignDepartment,
 };

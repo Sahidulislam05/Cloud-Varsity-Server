@@ -1,7 +1,11 @@
 import httpStatus from "http-status";
 import { prisma } from "../../lib/prisma";
 import { AppError } from "../../utils/appError";
-import type { TUpdateProfilePayload, TUserListQuery } from "./user.interface";
+import type {
+  TAssignDepartmentPayload,
+  TUpdateProfilePayload,
+  TUserListQuery,
+} from "./user.interface";
 import { AuditService } from "../audit/audit.service";
 import { sendTemplatedEmail } from "../../utils/sendTemplatedEmail";
 
@@ -127,4 +131,55 @@ const updateUserStatus = async (
   return updated;
 };
 
-export const UserService = { getMe, updateMe, getAllUsers, updateUserStatus };
+const assignDepartment = async (
+  userId: string,
+  payload: TAssignDepartmentPayload,
+  performedBy: string,
+) => {
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user || user.deletedAt)
+    throw new AppError(httpStatus.NOT_FOUND, "User not found");
+
+  if (user.role !== "DEPARTMENT_ADMIN")
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "Department can only be assigned to a Department Admin",
+    );
+
+  const department = await prisma.department.findFirst({
+    where: { id: payload.departmentId, deletedAt: null },
+  });
+  if (!department)
+    throw new AppError(httpStatus.NOT_FOUND, "Department not found");
+
+  const updated = await prisma.user.update({
+    where: { id: userId },
+    data: { departmentId: payload.departmentId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      departmentId: true,
+      department: { select: { id: true, name: true, code: true } },
+    },
+  });
+
+  await AuditService.logAction({
+    userId: performedBy,
+    action: "ASSIGN_DEPARTMENT",
+    entityName: "User",
+    entityId: userId,
+    oldValue: { departmentId: user.departmentId },
+    newValue: { departmentId: payload.departmentId },
+  });
+
+  return updated;
+};
+
+export const UserService = {
+  getMe,
+  updateMe,
+  getAllUsers,
+  updateUserStatus,
+  assignDepartment,
+};

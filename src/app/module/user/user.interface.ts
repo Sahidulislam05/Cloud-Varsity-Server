@@ -12,3 +12,7 @@ export type TUserListQuery = {
   role?: Role;
   search?: string;
 };
+
+export type TAssignDepartmentPayload = {
+  departmentId: string;
+};

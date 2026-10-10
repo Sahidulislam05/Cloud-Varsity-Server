@@ -9,3 +9,7 @@ export const updateProfileValidationSchema = z.object({
 export const updateUserStatusValidationSchema = z.object({
   isActive: z.boolean({ error: "isActive must be true or false" }),
 });
+
+export const assignDepartmentValidationSchema = z.object({
+  departmentId: z.string().min(1, "departmentId is required"),
+});

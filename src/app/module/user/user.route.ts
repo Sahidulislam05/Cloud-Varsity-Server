@@ -4,6 +4,7 @@ import { auth } from "../../middleware/checkAuth";
 import { validateRequest } from "../../middleware/validateRequest";
 import { UserController } from "./user.controller";
 import {
+  assignDepartmentValidationSchema,
   updateProfileValidationSchema,
   updateUserStatusValidationSchema,
 } from "./user.validation";
@@ -24,6 +25,12 @@ router.patch(
   auth("SUPER_ADMIN"),
   validateRequest(updateUserStatusValidationSchema),
   UserController.updateUserStatus,
+);
+router.patch(
+  "/:id/department",
+  auth("SUPER_ADMIN"),
+  validateRequest(assignDepartmentValidationSchema),
+  UserController.assignDepartment,
 );
 
 export const UserRoutes = router;
