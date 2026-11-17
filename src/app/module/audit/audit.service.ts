@@ -1,5 +1,6 @@
 import { Prisma } from "../../../generated/prisma/client";
 import { prisma } from "../../lib/prisma";
+import { parsePagination } from "../../utils/pagination";
 
 type TLogActionPayload = {
   userId: string | null;
@@ -23,9 +24,7 @@ const getAuditLogs = async (query: {
   limit?: string;
   entityName?: string;
 }) => {
-  const page = Number(query.page) || 1;
-  const limit = Number(query.limit) || 20;
-  const skip = (page - 1) * limit;
+  const { page, limit, skip } = parsePagination(query, 20);
   const where = { ...(query.entityName && { entityName: query.entityName }) };
 
   const [logs, total] = await Promise.all([

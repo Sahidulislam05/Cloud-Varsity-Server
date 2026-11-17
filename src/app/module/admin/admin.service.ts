@@ -1,12 +1,13 @@
 import { prisma } from "../../lib/prisma";
-import { redisClient } from "../../lib/redis";
+import { getRedis } from "../../lib/redis";
 
 const DASHBOARD_CACHE_KEY = "cache:dashboard-stats";
 const DASHBOARD_CACHE_TTL_SECONDS = 60;
 
 const getDashboardStats = async () => {
   try {
-    const cached = await redisClient.get(DASHBOARD_CACHE_KEY);
+    const redis = await getRedis();
+    const cached = await redis.get(DASHBOARD_CACHE_KEY);
     if (cached) return JSON.parse(cached);
   } catch (error) {
     console.error("Dashboard cache read failed, falling back to DB:", error);
@@ -54,7 +55,8 @@ const getDashboardStats = async () => {
   };
 
   try {
-    await redisClient.set(DASHBOARD_CACHE_KEY, JSON.stringify(stats), {
+    const redis = await getRedis();
+    await redis.set(DASHBOARD_CACHE_KEY, JSON.stringify(stats), {
       EX: DASHBOARD_CACHE_TTL_SECONDS,
     });
   } catch (error) {

@@ -119,12 +119,23 @@ const publishSectionResults = async (
   });
   if (!section) throw new AppError(httpStatus.NOT_FOUND, "Section not found");
 
-  const exams = await prisma.exam.findMany({ where: { sectionId } });
-  if (exams.length === 0)
+  const alreadyPublished = await prisma.courseRegistration.findFirst({
+    where: { sectionId, status: "COMPLETED" },
+  });
+  if (alreadyPublished) {
     throw new AppError(
       httpStatus.BAD_REQUEST,
-      "No exams found for this section",
+      "Results for this section have already been published",
     );
+  }
+
+  const exams = await prisma.exam.findMany({ where: { sectionId } });
+  if (!exams.some((exam) => exam.examType === "FINAL")) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "A FINAL exam is required before results can be published",
+    );
+  }
 
   const registrations = await prisma.courseRegistration.findMany({
     where: { sectionId, status: "ENROLLED" },
@@ -135,69 +146,73 @@ const publishSectionResults = async (
       "No enrolled students found for this section",
     );
 
-  const skippedStudents: string[] = [];
+  const examIds = exams.map((exam) => exam.id);
+  const results = await prisma.result.findMany({
+    where: {
+      examId: { in: examIds },
+      studentId: { in: registrations.map((r) => r.studentId) },
+    },
+  });
+  const marksByStudentExam = new Map(
+    results.map((r) => [`${r.studentId}:${r.examId}`, r.obtainedMarks]),
+  );
 
-  await prisma.$transaction(async (tx) => {
-    for (const registration of registrations) {
-      const results = await tx.result.findMany({
-        where: {
-          studentId: registration.studentId,
-          examId: { in: exams.map((e) => e.id) },
-        },
-      });
+  // All-or-nothing: publishing completes every registration, after which
+  // marks are locked, so every student must have marks for every exam.
+  const missingMarks = registrations.flatMap((registration) =>
+    exams
+      .filter(
+        (exam) =>
+          !marksByStudentExam.has(`${registration.studentId}:${exam.id}`),
+      )
+      .map(() => registration.studentId),
+  );
+  if (missingMarks.length > 0) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      `Marks are missing for ${new Set(missingMarks).size} student(s). Every enrolled student needs marks for every exam before publishing.`,
+    );
+  }
 
-      if (results.length === 0) {
-        skippedStudents.push(registration.studentId);
-        continue;
-      }
+  const publishedAt = new Date();
+  const grades = registrations.map((registration) => {
+    const percentage = calculateWeightedPercentage(
+      exams.map((exam) => ({
+        obtainedMarks: marksByStudentExam.get(
+          `${registration.studentId}:${exam.id}`,
+        ) as number,
+        totalMarks: exam.totalMarks,
+        examType: exam.examType,
+      })),
+    );
+    return { registration, ...calculateGrade(percentage) };
+  });
 
-      const resultsWithType = results.map((r) => {
-        const exam = exams.find((e) => e.id === r.examId)!;
-        return {
-          obtainedMarks: r.obtainedMarks,
-          totalMarks: exam.totalMarks,
-          examType: exam.examType,
-        };
-      });
-
-      const percentage = calculateWeightedPercentage(resultsWithType);
-      const { gradeLetter, gradePoint } = calculateGrade(percentage);
-
-      await tx.result.updateMany({
-        where: {
-          studentId: registration.studentId,
-          examId: { in: exams.map((e) => e.id) },
-        },
-        data: { publishedAt: new Date() },
-      });
-
-      await tx.courseRegistration.update({
+  await prisma.$transaction([
+    prisma.result.updateMany({
+      where: { examId: { in: examIds } },
+      data: { publishedAt },
+    }),
+    ...grades.map(({ registration, gradeLetter, gradePoint }) =>
+      prisma.courseRegistration.update({
         where: { id: registration.id },
         data: {
           status: "COMPLETED",
           finalGradeLetter: gradeLetter,
           finalGradePoint: gradePoint,
-          completedAt: new Date(),
+          completedAt: publishedAt,
         },
-      });
-    }
-  });
+      }),
+    ),
+  ]);
 
-  const affectedStudentIds = registrations
-    .map((r) => r.studentId)
-    .filter((id) => !skippedStudents.includes(id));
+  const affectedStudentIds = registrations.map((r) => r.studentId);
   for (const studentId of affectedStudentIds) {
     await recalculateCgpa(studentId);
   }
 
   const updatedRegistrations = await prisma.courseRegistration.findMany({
-    where: {
-      id: {
-        in: registrations
-          .filter((r) => !skippedStudents.includes(r.studentId))
-          .map((r) => r.id),
-      },
-    },
+    where: { id: { in: registrations.map((r) => r.id) } },
     include: { student: { include: { user: true } } },
   });
 
@@ -227,13 +242,10 @@ const publishSectionResults = async (
     action: "PUBLISH_RESULTS",
     entityName: "Section",
     entityId: sectionId,
-    newValue: {
-      publishedFor: affectedStudentIds.length,
-      skipped: skippedStudents.length,
-    },
+    newValue: { publishedFor: affectedStudentIds.length },
   });
 
-  return { publishedFor: affectedStudentIds.length, skipped: skippedStudents };
+  return { publishedFor: affectedStudentIds.length };
 };
 
 const getMyResults = async (userId: string) => {

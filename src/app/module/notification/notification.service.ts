@@ -7,6 +7,7 @@ import type {
   TCreateNotificationPayload,
   TNotificationListQuery,
 } from "./notification.interface";
+import { parsePagination } from "../../utils/pagination";
 
 // এটাই মূল reusable function — অন্য যেকোনো module সরাসরি import করে কল করবে
 const createNotification = async (payload: TCreateNotificationPayload) => {
@@ -39,9 +40,7 @@ const getMyNotifications = async (
   userId: string,
   query: TNotificationListQuery,
 ) => {
-  const page = Number(query.page) || 1;
-  const limit = Number(query.limit) || 10;
-  const skip = (page - 1) * limit;
+  const { page, limit, skip } = parsePagination(query);
 
   const where = {
     userId,

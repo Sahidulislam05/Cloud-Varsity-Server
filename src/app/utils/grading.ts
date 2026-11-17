@@ -22,18 +22,37 @@ export const calculateGrade = (
   return { gradeLetter: "F", gradePoint: 0.0 };
 };
 
+/**
+ * Weighted percentage for one student in one section.
+ *
+ * Pass one entry per exam of the section (an exam the student has no result
+ * for counts as 0 obtained marks). Exams of the same type are averaged, so
+ * e.g. three quizzes together still carry the QUIZ weight once. A type with
+ * no exams contributes 0 while its weight still counts in the denominator,
+ * so partial assessment can never inflate a grade.
+ */
 export const calculateWeightedPercentage = (
   results: { obtainedMarks: number; totalMarks: number; examType: ExamType }[],
 ) => {
-  let weightedSum = 0;
-  let totalWeight = 0;
-
+  const percentagesByType = new Map<ExamType, number[]>();
   for (const result of results) {
-    const weight = EXAM_TYPE_WEIGHTS[result.examType];
     const percentage = (result.obtainedMarks / result.totalMarks) * 100;
-    weightedSum += percentage * weight;
-    totalWeight += weight;
+    const list = percentagesByType.get(result.examType) ?? [];
+    list.push(percentage);
+    percentagesByType.set(result.examType, list);
   }
 
-  return totalWeight === 0 ? 0 : weightedSum / totalWeight;
+  let weightedSum = 0;
+  for (const [examType, percentages] of percentagesByType) {
+    const average =
+      percentages.reduce((sum, value) => sum + value, 0) / percentages.length;
+    weightedSum += average * EXAM_TYPE_WEIGHTS[examType];
+  }
+
+  const fullTotalWeight = Object.values(EXAM_TYPE_WEIGHTS).reduce(
+    (sum, weight) => sum + weight,
+    0,
+  );
+
+  return fullTotalWeight === 0 ? 0 : weightedSum / fullTotalWeight;
 };

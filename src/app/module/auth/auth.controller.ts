@@ -5,18 +5,18 @@ import { catchAsync } from "../../utils/catchAsync";
 import { sendResponse } from "../../utils/sendResponse";
 import { AuthService } from "./auth.service";
 
-// const cookieOptions = {
-//   httpOnly: true,
-//   secure: config.node_env === "production",
-//   sameSite: "strict" as const,
-// };
-
 const isProduction = config.node_env === "production";
 
+/**
+ * The frontend reaches this API through a same-origin rewrite, so the refresh
+ * cookie is first-party: SameSite=Lax works and blocks cross-site use. The
+ * path limits the cookie to the auth endpoints that read it.
+ */
 const cookieOptions = {
   httpOnly: true,
   secure: isProduction,
-  sameSite: isProduction ? ("none" as const) : ("lax" as const),
+  sameSite: "lax" as const,
+  path: "/api/v1/auth",
 };
 
 const refreshCookieOptions = {
@@ -24,9 +24,24 @@ const refreshCookieOptions = {
   maxAge: 7 * 24 * 60 * 60 * 1000,
 };
 
+/** Cookie is primary; the frontend may also send { refreshToken } in the body. */
+const getRefreshToken = (req: Request): string => {
+  const fromCookie = req.cookies?.refreshToken;
+  if (typeof fromCookie === "string" && fromCookie.length > 0) {
+    return fromCookie;
+  }
+  const fromBody = (req.body as { refreshToken?: unknown } | undefined)
+    ?.refreshToken;
+  return typeof fromBody === "string" && fromBody.length > 0 ? fromBody : "";
+};
+
+const setRefreshCookie = (res: Response, refreshToken: string) => {
+  res.cookie("refreshToken", refreshToken, refreshCookieOptions);
+};
+
 const registerUser = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.registerUser(req.body);
-  res.cookie("refreshToken", result.refreshToken, refreshCookieOptions);
+  setRefreshCookie(res, result.refreshToken);
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.CREATED,
@@ -37,7 +52,7 @@ const registerUser = catchAsync(async (req: Request, res: Response) => {
 
 const loginUser = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.loginUser(req.body);
-  res.cookie("refreshToken", result.refreshToken, refreshCookieOptions);
+  setRefreshCookie(res, result.refreshToken);
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
@@ -47,16 +62,19 @@ const loginUser = catchAsync(async (req: Request, res: Response) => {
 });
 
 const refreshToken = catchAsync(async (req: Request, res: Response) => {
-  const result = await AuthService.refreshAccessToken(req.cookies.refreshToken);
+  const result = await AuthService.refreshAccessToken(getRefreshToken(req));
+  // Rotation: the old refresh token is spent, store the new one.
+  setRefreshCookie(res, result.refreshToken);
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
     message: "Access token refreshed",
-    data: result,
+    data: { accessToken: result.accessToken, user: result.user },
   });
 });
 
 const logoutUser = catchAsync(async (req: Request, res: Response) => {
+  await AuthService.logoutUser(getRefreshToken(req));
   res.clearCookie("refreshToken", cookieOptions);
   sendResponse(res, {
     success: true,
@@ -68,11 +86,22 @@ const logoutUser = catchAsync(async (req: Request, res: Response) => {
 
 const googleLogin = catchAsync(async (req: Request, res: Response) => {
   const result = await AuthService.googleLogin(req.body);
-  res.cookie("refreshToken", result.refreshToken, refreshCookieOptions);
+  setRefreshCookie(res, result.refreshToken);
   sendResponse(res, {
     success: true,
     statusCode: httpStatus.OK,
     message: "Logged in with Google successfully",
+    data: { accessToken: result.accessToken, user: result.user },
+  });
+});
+
+const demoLogin = catchAsync(async (req: Request, res: Response) => {
+  const result = await AuthService.demoLogin(req.body);
+  setRefreshCookie(res, result.refreshToken);
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.OK,
+    message: "Logged in to the demo account successfully",
     data: { accessToken: result.accessToken, user: result.user },
   });
 });
@@ -103,6 +132,7 @@ export const AuthController = {
   refreshToken,
   logoutUser,
   googleLogin,
+  demoLogin,
   forgotPassword,
   resetPassword,
 };

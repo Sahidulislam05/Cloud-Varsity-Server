@@ -16,3 +16,17 @@ export type TUserListQuery = {
 export type TAssignDepartmentPayload = {
   departmentId: string;
 };
+
+export type TStaffRole = Extract<
+  Role,
+  "INSTRUCTOR" | "DEPARTMENT_ADMIN" | "REGISTRAR" | "FINANCE_ADMIN"
+>;
+
+export type TCreateStaffUserPayload = {
+  name: string;
+  email: string;
+  role: TStaffRole;
+  departmentId?: string;
+  employeeId?: string;
+  designation?: string;
+};

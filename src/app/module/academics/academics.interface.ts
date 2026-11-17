@@ -33,6 +33,7 @@ export type TCourseListQuery = {
   limit?: string;
   search?: string;
   programId?: string;
+  departmentId?: string;
   sortBy?: "title" | "code" | "creditHours" | "createdAt";
   sortOrder?: "asc" | "desc";
 };

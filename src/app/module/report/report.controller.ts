@@ -8,6 +8,7 @@ import { ReportService } from "./report.service";
 const getEnrollmentReport = catchAsync(async (req: Request, res: Response) => {
   const result = await ReportService.getEnrollmentReport(
     req.query as TReportQuery,
+    req.user!,
   );
   sendResponse(res, {
     success: true,
@@ -20,6 +21,7 @@ const getEnrollmentReport = catchAsync(async (req: Request, res: Response) => {
 const getAttendanceReport = catchAsync(async (req: Request, res: Response) => {
   const result = await ReportService.getAttendanceReport(
     req.query as TReportQuery,
+    req.user!,
   );
   sendResponse(res, {
     success: true,

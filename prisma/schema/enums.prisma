@@ -49,4 +49,5 @@ enum PaymentStatus {
   SUCCESS
   FAILED
   CANCELLED
+  REFUND_REQUIRED // charged by the gateway for an invoice that was already paid
 }

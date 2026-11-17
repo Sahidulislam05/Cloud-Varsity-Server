@@ -33,4 +33,13 @@ export type TJwtPayload = {
   name: string;
   email: string;
   role: Role;
+  /** Unique token id, added to both access and refresh tokens. */
+  jti?: string;
+  /** Numeric JWT claims populated after verification. */
+  iat?: number;
+  exp?: number;
+};
+
+export type TDemoLoginPayload = {
+  role: Role;
 };

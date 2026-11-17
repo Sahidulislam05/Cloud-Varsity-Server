@@ -1,11 +1,28 @@
 import { prisma } from "../../lib/prisma";
+import type { Role } from "../../../generated/prisma/enums";
+import { departmentScopeOf } from "../../utils/assertDepartmentAccess";
 import type { TReportQuery } from "./report.interface";
 
-const getEnrollmentReport = async (query: TReportQuery) => {
+type TReportRequester = { role: Role; departmentId: string | null };
+
+/**
+ * Department admins only see data for their own department's programs
+ * (same scoping enrollment.service applies); SUPER_ADMIN/REGISTRAR see all.
+ */
+const departmentScope = (requester: TReportRequester) => {
+  const departmentId = departmentScopeOf(requester.role, requester.departmentId);
+  return departmentId ? { course: { program: { departmentId } } } : {};
+};
+
+const getEnrollmentReport = async (
+  query: TReportQuery,
+  requester: TReportRequester,
+) => {
   const sections = await prisma.section.findMany({
     where: {
       deletedAt: null,
       ...(query.semesterId && { semesterId: query.semesterId }),
+      ...departmentScope(requester),
     },
     include: {
       course: true,
@@ -31,11 +48,15 @@ const getEnrollmentReport = async (query: TReportQuery) => {
   }));
 };
 
-const getAttendanceReport = async (query: TReportQuery) => {
+const getAttendanceReport = async (
+  query: TReportQuery,
+  requester: TReportRequester,
+) => {
   const sections = await prisma.section.findMany({
     where: {
       deletedAt: null,
       ...(query.semesterId && { semesterId: query.semesterId }),
+      ...departmentScope(requester),
     },
     include: { course: true, attendances: true },
   });

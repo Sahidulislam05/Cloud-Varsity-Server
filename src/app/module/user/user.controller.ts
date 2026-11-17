@@ -6,6 +6,16 @@ import { sendResponse } from "../../utils/sendResponse";
 import type { TUserListQuery } from "./user.interface";
 import { UserService } from "./user.service";
 
+const createStaffUser = catchAsync(async (req: Request, res: Response) => {
+  const result = await UserService.createStaffUser(req.body, req.user!.userId);
+  sendResponse(res, {
+    success: true,
+    statusCode: httpStatus.CREATED,
+    message: "Staff account created. A set-password email has been sent.",
+    data: result,
+  });
+});
+
 const getMe = catchAsync(async (req: Request, res: Response) => {
   const result = await UserService.getMe(req.user!.userId);
   sendResponse(res, {
@@ -54,7 +64,7 @@ const updateUserStatus = catchAsync(async (req: Request, res: Response) => {
 
 const assignDepartment = catchAsync(async (req: Request, res: Response) => {
   const result = await UserService.assignDepartment(
-    req.params.id,
+    String(req.params.id),
     req.body,
     req.user!.userId,
   );
@@ -68,6 +78,7 @@ const assignDepartment = catchAsync(async (req: Request, res: Response) => {
 });
 
 export const UserController = {
+  createStaffUser,
   getMe,
   updateMe,
   getAllUsers,

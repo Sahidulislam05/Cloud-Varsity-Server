@@ -14,6 +14,16 @@ const createExam = async (payload: TCreateExamPayload, requester: TRequester) =>
     throw new AppError(httpStatus.FORBIDDEN, "Only the assigned instructor can create exams for this section");
   }
 
+  const published = await prisma.courseRegistration.findFirst({
+    where: { sectionId: payload.sectionId, status: "COMPLETED" },
+  });
+  if (published) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "Results for this section have already been published; no new exams can be added",
+    );
+  }
+
   return prisma.exam.create({
     data: {
       sectionId: payload.sectionId,

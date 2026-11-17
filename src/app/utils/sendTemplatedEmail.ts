@@ -1,8 +1,13 @@
 import ejs from "ejs";
-import path from "node:path";
 import config from "../config";
 import { transporter } from "../lib/nodemailer";
+import { resolveTemplatePath } from "./templateResolver";
 
+/**
+ * Non-fatal templated email for notifications (welcome, result published,
+ * payment confirmation, ...). Failures are logged, never thrown — the
+ * business action that triggered the email must not break.
+ */
 export const sendTemplatedEmail = async (
   to: string,
   subject: string,
@@ -10,10 +15,7 @@ export const sendTemplatedEmail = async (
   data: Record<string, unknown>,
 ) => {
   try {
-    const html = await ejs.renderFile(
-      path.join(process.cwd(), "src/app/templates", `${templateName}.ejs`),
-      data,
-    );
+    const html = await ejs.renderFile(resolveTemplatePath(templateName), data);
     await transporter.sendMail({
       from: config.email_sender,
       to,

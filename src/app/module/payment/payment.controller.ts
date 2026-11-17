@@ -1,20 +1,17 @@
 import type { Request, Response } from "express";
 import httpStatus from "http-status";
-import config from "../../config";
 import { catchAsync } from "../../utils/catchAsync";
+import { frontendUrl } from "../../utils/frontendUrl";
 import { sendResponse } from "../../utils/sendResponse";
 import { PaymentService } from "./payment.service";
 import { TInvoiceListQuery } from "../finance/finance.interface";
-
-const frontendBase = () =>
-  (config.frontend_url ?? "").split(",")[0].trim().replace(/\/$/, "");
 
 const redirectToFrontend = (
   res: Response,
   path: string,
   params: Record<string, string | undefined>,
 ) => {
-  const url = new URL(`${frontendBase()}${path}`);
+  const url = frontendUrl(path);
   for (const [key, value] of Object.entries(params)) {
     if (value) url.searchParams.set(key, value);
   }
@@ -30,7 +27,7 @@ const getBodyString = (body: unknown, key: string): string | undefined => {
 const initiatePayment = catchAsync(async (req: Request, res: Response) => {
   const result = await PaymentService.initiatePayment(
     req.user!.userId,
-    req.params.invoiceId,
+    String(req.params.invoiceId),
   );
   sendResponse(res, {
     success: true,
@@ -51,14 +48,16 @@ const paymentSuccess = catchAsync(async (req: Request, res: Response) => {
       verified = true;
     }
   } catch {
-    // SSLCommerz এর validate ব্যর্থ হলে ইউজারকে JSON error না দেখিয়ে ব্যর্থতার পেজে পাঠাই
+    // SSLCommerz validate failed or the callback could not be bound to a
+    // payment record — send the user to the fail page instead of showing
+    // a JSON error from the gateway callback.
     verified = false;
   }
 
   if (verified)
     redirectToFrontend(res, "/payment/success", { tran_id: tranId });
   else
-    redirectToFrontend(res, "/payment/cancel", {
+    redirectToFrontend(res, "/payment/fail", {
       tran_id: tranId,
       reason: "failed",
     });
@@ -66,9 +65,10 @@ const paymentSuccess = catchAsync(async (req: Request, res: Response) => {
 
 const paymentFail = catchAsync(async (req: Request, res: Response) => {
   const tranId = getBodyString(req.body, "tran_id");
-  // ⚠️ tran_id না থাকলে updateMany এর where ফাঁকা হয়ে যেত আর সবার PENDING payment FAILED হয়ে যেত
+  // Without tran_id, updateMany's where clause would be empty and every
+  // PENDING payment in the table would be flipped to FAILED.
   if (tranId) await PaymentService.markPaymentFailed(tranId);
-  redirectToFrontend(res, "/payment/cancel", {
+  redirectToFrontend(res, "/payment/fail", {
     tran_id: tranId,
     reason: "failed",
   });
@@ -87,7 +87,9 @@ const paymentIpn = catchAsync(async (req: Request, res: Response) => {
   try {
     if (tranId && valId) await PaymentService.completePayment(tranId, valId);
   } catch {
-    // IPN কে সবসময় 200 দিয়ে জানাতে হয়, নইলে SSLCommerz বারবার retry করে
+    // SSLCommerz expects a 200 for every IPN, otherwise it keeps retrying.
+    // Validation failures were already surfaced to the user via the
+    // browser-side success/fail callbacks.
   }
   res.status(httpStatus.OK).send("IPN received");
 });

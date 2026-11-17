@@ -31,3 +31,14 @@ export const resetPasswordValidationSchema = z.object({
     .string()
     .min(6, { error: "Password must be at least 6 characters" }),
 });
+
+export const demoLoginValidationSchema = z.object({
+  role: z.enum([
+    "STUDENT",
+    "INSTRUCTOR",
+    "DEPARTMENT_ADMIN",
+    "REGISTRAR",
+    "FINANCE_ADMIN",
+    "SUPER_ADMIN",
+  ]),
+});

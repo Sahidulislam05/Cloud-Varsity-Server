@@ -2,9 +2,11 @@ import httpStatus from "http-status";
 import type { Role } from "../../../generated/prisma/enums";
 import { prisma } from "../../lib/prisma";
 import { AppError } from "../../utils/appError";
+import { departmentScopeOf } from "../../utils/assertDepartmentAccess";
 import type { TRegistrationListQuery } from "./enrollment.interface";
 import { NotificationService } from "../notification/notification.service";
 import { sendTemplatedEmail } from "../../utils/sendTemplatedEmail";
+import { parsePagination } from "../../utils/pagination";
 
 const registerCourse = async (userId: string, sectionId: string) => {
   const studentProfile = await prisma.studentProfile.findUnique({
@@ -41,6 +43,21 @@ const registerCourse = async (userId: string, sectionId: string) => {
     throw new AppError(
       httpStatus.BAD_REQUEST,
       "You have already completed this course",
+    );
+  }
+
+  const enrolledInOtherSection = await prisma.courseRegistration.findFirst({
+    where: {
+      studentId: studentProfile.id,
+      status: "ENROLLED",
+      sectionId: { not: sectionId },
+      section: { courseId: section.courseId },
+    },
+  });
+  if (enrolledInOtherSection) {
+    throw new AppError(
+      httpStatus.BAD_REQUEST,
+      "You are already enrolled in another section of this course",
     );
   }
 
@@ -195,21 +212,16 @@ const getAllRegistrations = async (
   query: TRegistrationListQuery,
   requester: { role: Role; departmentId: string | null },
 ) => {
-  const page = Number(query.page) || 1;
-  const limit = Number(query.limit) || 10;
-  const skip = (page - 1) * limit;
+  const { page, limit, skip } = parsePagination(query);
 
+  const departmentId = departmentScopeOf(requester.role, requester.departmentId);
   const where = {
     ...(query.sectionId && { sectionId: query.sectionId }),
     ...(query.status && {
       status: query.status as "ENROLLED" | "DROPPED" | "COMPLETED",
     }),
-    ...(requester.role === "DEPARTMENT_ADMIN" && {
-      section: {
-        course: {
-          program: { departmentId: requester.departmentId ?? undefined },
-        },
-      },
+    ...(departmentId && {
+      section: { course: { program: { departmentId } } },
     }),
   };
 

@@ -5,6 +5,7 @@ import { validateRequest } from "../../middleware/validateRequest";
 import { UserController } from "./user.controller";
 import {
   assignDepartmentValidationSchema,
+  createStaffUserValidationSchema,
   updateProfileValidationSchema,
   updateUserStatusValidationSchema,
 } from "./user.validation";
@@ -19,6 +20,12 @@ router.patch(
   UserController.updateMe,
 );
 
+router.post(
+  "/",
+  auth("SUPER_ADMIN"),
+  validateRequest(createStaffUserValidationSchema),
+  UserController.createStaffUser,
+);
 router.get("/", auth("SUPER_ADMIN"), UserController.getAllUsers);
 router.patch(
   "/:id/status",

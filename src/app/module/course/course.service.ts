@@ -9,6 +9,7 @@ import type {
 } from "../academics/academics.interface";
 import type { Role } from "../../../generated/prisma/enums";
 import { AuditService } from "../audit/audit.service";
+import { parsePagination } from "../../utils/pagination";
 
 const createCourse = async (
   payload: TCreateCoursePayload,
@@ -64,13 +65,14 @@ const getSortOrderBy = (sortBy?: string, sortOrder?: string) => {
 };
 
 const getAllCourses = async (query: TCourseListQuery) => {
-  const page = Number(query.page) || 1;
-  const limit = Number(query.limit) || 10;
-  const skip = (page - 1) * limit;
+  const { page, limit, skip } = parsePagination(query);
 
   const where = {
     deletedAt: null,
     ...(query.programId && { programId: query.programId }),
+    ...(query.departmentId && {
+      program: { departmentId: query.departmentId },
+    }),
     ...(query.search && {
       OR: [
         { title: { contains: query.search, mode: "insensitive" as const } },

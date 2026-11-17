@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { defineConfig } from "tsup";
 
 export default defineConfig({
@@ -9,6 +10,13 @@ export default defineConfig({
   bundle: true,
   splitting: false,
   sourcemap: true,
+  // Copy EJS templates to dist/templates so they resolve at runtime in prod.
+  onSuccess: async () => {
+    await fs.promises.cp("src/app/templates", "dist/templates", {
+      recursive: true,
+    });
+    console.log("Copied src/app/templates -> dist/templates");
+  },
   // Add banner to shim require() for CJS dependencies in ESM context
   banner: {
     js: `

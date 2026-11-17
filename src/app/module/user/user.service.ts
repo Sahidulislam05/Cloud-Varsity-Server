@@ -3,11 +3,15 @@ import { prisma } from "../../lib/prisma";
 import { AppError } from "../../utils/appError";
 import type {
   TAssignDepartmentPayload,
+  TCreateStaffUserPayload,
+  TStaffRole,
   TUpdateProfilePayload,
   TUserListQuery,
 } from "./user.interface";
 import { AuditService } from "../audit/audit.service";
+import { frontendUrl } from "../../utils/frontendUrl";
 import { sendTemplatedEmail } from "../../utils/sendTemplatedEmail";
+import { parsePagination } from "../../utils/pagination";
 
 const getMe = async (userId: string) => {
   const user = await prisma.user.findUnique({
@@ -50,9 +54,7 @@ const updateMe = async (userId: string, payload: TUpdateProfilePayload) => {
 };
 
 const getAllUsers = async (query: TUserListQuery) => {
-  const page = Number(query.page) || 1;
-  const limit = Number(query.limit) || 10;
-  const skip = (page - 1) * limit;
+  const { page, limit, skip } = parsePagination(query);
 
   const where = {
     deletedAt: null,
@@ -176,7 +178,106 @@ const assignDepartment = async (
   return updated;
 };
 
+const STAFF_ROLE_LABELS: Record<TStaffRole, string> = {
+  INSTRUCTOR: "Instructor",
+  DEPARTMENT_ADMIN: "Department Admin",
+  REGISTRAR: "Registrar",
+  FINANCE_ADMIN: "Finance Admin",
+};
+
+/**
+ * Creates a staff account without a password. The new user sets one through
+ * the forgot-password (OTP) flow linked in the email, so no administrator
+ * ever knows or transmits it.
+ */
+const createStaffUser = async (
+  payload: TCreateStaffUserPayload,
+  performedBy: string,
+) => {
+  const existingUser = await prisma.user.findUnique({
+    where: { email: payload.email },
+  });
+  if (existingUser) {
+    throw new AppError(httpStatus.CONFLICT, "This email is already registered");
+  }
+
+  if (payload.departmentId) {
+    const department = await prisma.department.findFirst({
+      where: { id: payload.departmentId, deletedAt: null },
+    });
+    if (!department)
+      throw new AppError(httpStatus.NOT_FOUND, "Department not found");
+  }
+
+  if (payload.employeeId) {
+    const existingEmployee = await prisma.instructorProfile.findUnique({
+      where: { employeeId: payload.employeeId },
+    });
+    if (existingEmployee) {
+      throw new AppError(httpStatus.CONFLICT, "This employee ID is already in use");
+    }
+  }
+
+  const user = await prisma.$transaction(async (tx) => {
+    const created = await tx.user.create({
+      data: {
+        name: payload.name,
+        email: payload.email,
+        role: payload.role,
+        // Department admins are scoped through User.departmentId; instructors
+        // through their InstructorProfile.
+        departmentId:
+          payload.role === "DEPARTMENT_ADMIN" ? payload.departmentId : null,
+      },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+      },
+    });
+
+    if (payload.role === "INSTRUCTOR") {
+      await tx.instructorProfile.create({
+        data: {
+          userId: created.id,
+          employeeId: payload.employeeId as string,
+          departmentId: payload.departmentId as string,
+          designation: payload.designation as string,
+        },
+      });
+    }
+
+    return created;
+  });
+
+  await AuditService.logAction({
+    userId: performedBy,
+    action: "CREATE_STAFF_USER",
+    entityName: "User",
+    entityId: user.id,
+    newValue: { email: user.email, role: user.role },
+  });
+
+  await sendTemplatedEmail(
+    user.email,
+    "Your CloudVarsity account is ready",
+    "staff-account-created",
+    {
+      name: user.name,
+      email: user.email,
+      roleLabel: STAFF_ROLE_LABELS[payload.role],
+      setPasswordUrl: frontendUrl("/forgot-password").toString(),
+    },
+  );
+
+  return user;
+};
+
 export const UserService = {
+  createStaffUser,
   getMe,
   updateMe,
   getAllUsers,

@@ -4,8 +4,20 @@ import { Prisma } from "../../generated/prisma/client";
 import config from "../config";
 import { AppError } from "../utils/appError";
 
+/**
+ * Minimal shape of the errors this handler understands. AppError,
+ * PrismaClientKnownRequestError etc. all structurally satisfy it; the
+ * narrowing below dispatches on the concrete instance.
+ */
+type HandlerError = Error & {
+  statusCode?: number;
+  errors?: { field?: string; message: string }[];
+  code?: string;
+  errorCode?: string;
+};
+
 export const globalErrorHandler = async (
-  err: any,
+  err: HandlerError,
   _req: Request,
   res: Response,
   _next: NextFunction,
